@@ -1,0 +1,715 @@
+!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FRP &amp; FPK Review Monitoring Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --blue-900: #1e3a5f;
+  --blue-800: #1a4a7a;
+  --blue-700: #1a56db;
+  --blue-100: #dbeafe;
+  --blue-50:  #eff6ff;
+  --white:    #ffffff;
+  --surface:  #f1f5f9;
+  --border:   #cbd5e1;
+  --text:     #1e293b;
+  --muted:    #64748b;
+  --green:    #16a34a;
+  --green-bg: #dcfce7;
+  --yellow:   #ca8a04;
+  --yellow-bg:#fef9c3;
+  --red:      #dc2626;
+  --red-bg:   #fee2e2;
+  --orange:   #ea580c;
+  --orange-bg:#ffedd5;
+  --radius:   8px;
+  --shadow:   0 2px 8px rgba(30,58,95,.10);
+}
+body { font-family: -apple-system,"Segoe UI",system-ui,sans-serif; font-size: 14px; background: var(--surface); color: var(--text); min-height: 100vh; }
+
+/* HEADER */
+header { background: linear-gradient(135deg, var(--blue-900) 0%, var(--blue-800) 100%); color: var(--white); padding: 20px 24px 16px; }
+.header-top { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; }
+.header-titles h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: .3px; }
+.header-titles h2 { font-size: .95rem; font-weight: 400; opacity: .85; margin-top: 4px; }
+.session-block { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,.12); padding: 8px 14px; border-radius: var(--radius); }
+.session-block label { font-size: .8rem; opacity: .8; }
+.session-block input { background: transparent; border: none; border-bottom: 1px solid rgba(255,255,255,.5); color: var(--white); font-size: .95rem; font-weight: 600; width: 160px; outline: none; text-align: center; padding: 2px 4px; }
+
+/* VIEW TABS */
+.view-tabs { display: flex; gap: 8px; padding: 16px 24px 0; flex-wrap: wrap; }
+.view-tab { border: 2px solid var(--border); border-radius: var(--radius); padding: 8px 20px; font-size: .88rem; font-weight: 600; cursor: pointer; background: var(--white); color: var(--muted); transition: all .15s; }
+.view-tab:hover { border-color: var(--blue-700); color: var(--blue-700); }
+.view-tab.active { background: var(--blue-700); color: var(--white); border-color: var(--blue-700); }
+.view-banner { margin: 10px 24px 0; background: var(--blue-900); color: var(--white); padding: 7px 16px; border-radius: var(--radius); font-size: .82rem; font-weight: 600; }
+
+/* CARDS */
+.cards-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 14px; padding: 16px 24px 0; }
+.card { background: var(--white); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); border-top: 4px solid var(--blue-700); }
+.card.green  { border-top-color: var(--green); }
+.card.yellow { border-top-color: var(--yellow); }
+.card.orange { border-top-color: var(--orange); }
+.card-label { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 5px; }
+.card-value { font-size: 1.8rem; font-weight: 700; line-height: 1; color: var(--text); }
+.card-sub   { font-size: .72rem; color: var(--muted); margin-top: 4px; }
+
+/* PROGRESS BARS */
+.progress-section { padding: 14px 24px 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.progress-card { background: var(--white); border-radius: var(--radius); padding: 12px 16px; box-shadow: var(--shadow); }
+.progress-label { font-size: .78rem; font-weight: 600; color: var(--text); margin-bottom: 7px; display: flex; justify-content: space-between; }
+.pbar { background: var(--border); border-radius: 99px; height: 9px; overflow: hidden; }
+.pbar-fill { height: 100%; border-radius: 99px; transition: width .6s ease; }
+.pbar-fill.blue   { background: var(--blue-700); }
+.pbar-fill.green  { background: var(--green); }
+.pbar-fill.orange { background: var(--orange); }
+
+/* CHARTS */
+.charts-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; padding: 14px 24px 0; }
+.chart-card { background: var(--white); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
+.chart-title { font-size: .85rem; font-weight: 600; color: var(--text); margin-bottom: 12px; }
+.chart-wrap  { position: relative; height: 220px; }
+
+/* INFO PANEL */
+.info-panel { margin: 14px 24px 0; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius); padding: 10px 16px; font-size: .8rem; color: #1e40af; line-height: 1.6; }
+
+/* TOOLBAR */
+.toolbar { padding: 14px 24px 0; display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.toolbar input, .toolbar select { border: 1px solid var(--border); border-radius: var(--radius); padding: 7px 10px; font-size: .85rem; background: var(--white); color: var(--text); outline: none; height: 36px; }
+.toolbar input { min-width: 220px; flex: 1 1 220px; }
+.toolbar select { min-width: 150px; }
+.toolbar input:focus, .toolbar select:focus { border-color: var(--blue-700); }
+.btn { display: inline-flex; align-items: center; gap: 6px; border: none; border-radius: var(--radius); padding: 8px 16px; font-size: .85rem; font-weight: 600; cursor: pointer; transition: filter .15s; white-space: nowrap; }
+.btn:hover { filter: brightness(.92); }
+.btn-primary   { background: var(--blue-700); color: var(--white); }
+.btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+.btn-danger    { background: var(--red-bg); color: var(--red); }
+.btn-sm { padding: 4px 10px; font-size: .78rem; }
+
+/* TABLE */
+.table-section { padding: 14px 24px 24px; }
+.table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
+.table-header h3 { font-size: .95rem; font-weight: 600; }
+.table-wrap { overflow-x: auto; border-radius: var(--radius); box-shadow: var(--shadow); }
+table { width: 100%; border-collapse: collapse; background: var(--white); min-width: 1100px; }
+thead tr:first-child th { background: var(--blue-900); color: var(--white); padding: 9px 10px; text-align: center; font-size: .75rem; letter-spacing: .3px; }
+thead tr:last-child th  { background: #2d4f7c; color: #cbd5e1; padding: 7px 10px; text-align: center; font-size: .72rem; white-space: nowrap; }
+thead th.left { text-align: left; }
+tbody tr:nth-child(even) { background: var(--blue-50); }
+tbody tr:hover { background: var(--blue-100); }
+tbody td { padding: 8px 10px; font-size: .81rem; border-bottom: 1px solid var(--border); vertical-align: middle; text-align: center; }
+tbody td.left { text-align: left; }
+.sample-badge { font-size: .67rem; background: #fef3c7; color: #92400e; border-radius: 99px; padding: 1px 6px; margin-left: 4px; border: 1px solid #fcd34d; }
+.status-badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: .72rem; font-weight: 600; white-space: nowrap; }
+.s-completed    { background: var(--green-bg);  color: var(--green); }
+.s-inprogress   { background: var(--yellow-bg); color: var(--yellow); }
+.s-notstarted   { background: var(--red-bg);    color: var(--red); }
+.s-correction   { background: var(--orange-bg); color: var(--orange); }
+.s-notcompleted { background: #f3e8ff; color: #7e22ce; }
+.actions-cell { display: flex; gap: 5px; justify-content: center; white-space: nowrap; }
+#empty-row td { text-align: center; color: var(--muted); padding: 24px; }
+.th-frp { background: #1e4d8c !important; }
+.th-fpk { background: #145a32 !important; color: #a7f3d0 !important; }
+
+/* MODAL */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 1000; align-items: center; justify-content: center; padding: 16px; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--white); border-radius: var(--radius); width: 100%; max-width: 740px; max-height: 92vh; overflow-y: auto; box-shadow: 0 8px 40px rgba(0,0,0,.2); }
+.modal-header { background: var(--blue-900); color: var(--white); padding: 14px 20px; border-radius: var(--radius) var(--radius) 0 0; display: flex; justify-content: space-between; align-items: center; }
+.modal-header h3 { font-size: 1rem; font-weight: 600; }
+.modal-close { background: none; border: none; color: var(--white); font-size: 1.3rem; cursor: pointer; line-height: 1; padding: 0 4px; }
+.modal-body { padding: 18px 20px; }
+.modal-section { margin-bottom: 16px; }
+.modal-section-title { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--white); padding: 5px 10px; border-radius: 4px; margin-bottom: 10px; }
+.ms-blue { background: #1a4a7a; }
+.ms-frp  { background: #1e4d8c; }
+.ms-fpk  { background: #145a32; }
+.form-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; }
+.form-group  { display: flex; flex-direction: column; gap: 4px; }
+.form-group.full { grid-column: 1 / -1; }
+.form-group label { font-size: .76rem; font-weight: 600; color: var(--text); }
+.form-group input, .form-group select, .form-group textarea { border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: .83rem; color: var(--text); outline: none; background: var(--white); }
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--blue-700); }
+.form-group textarea { resize: vertical; min-height: 55px; }
+.modal-footer { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
+
+footer { text-align: center; font-size: .75rem; color: var(--muted); padding: 16px 24px; border-top: 1px solid var(--border); margin-top: 8px; }
+
+@media (max-width: 600px) {
+  .cards-row, .progress-section, .charts-row, .toolbar, .table-section, .info-panel, .view-tabs, .view-banner { padding-left: 16px; padding-right: 16px; }
+  header { padding: 14px 16px 12px; }
+  .header-titles h1 { font-size: 1.05rem; }
+  .form-grid, .form-grid-4 { grid-template-columns: 1fr 1fr; }
+  .session-block { width: 100%; justify-content: center; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="header-top">
+    <div class="header-titles">
+      <h1>FRP &amp; FPK REVIEW MONITORING DASHBOARD</h1>
+      <h2>Department of Commerce, Politeknik Port Dickson, Malaysia</h2>
+    </div>
+    <div class="session-block">
+      <label for="sess">Sesi Akademik:</label>
+      <input id="sess" type="text" placeholder="cth. 2024/2025 Sem 1" onchange="saveSession()" />
+    </div>
+  </div>
+</header>
+
+<!-- VIEW TABS -->
+<div class="view-tabs">
+  <button class="view-tab active" id="tab-all"  onclick="setView('all')">Semua Semakan</button>
+  <button class="view-tab"        id="tab-sem1" onclick="setView('sem1')">Semakan 1</button>
+  <button class="view-tab"        id="tab-sem2" onclick="setView('sem2')">Semakan 2</button>
+</div>
+<div class="view-banner" id="viewBanner">Paparan: Semua Semakan</div>
+
+<!-- CARDS -->
+<div class="cards-row">
+  <div class="card">
+    <div class="card-label">Jumlah Kursus</div>
+    <div class="card-value" id="stat-total">0</div>
+    <div class="card-sub">Rekod berdaftar</div>
+  </div>
+  <div class="card green">
+    <div class="card-label" id="lbl-frp">FRP Completed</div>
+    <div class="card-value" id="stat-frp-done">0</div>
+    <div class="card-sub"   id="sub-frp-pct">0% siap</div>
+  </div>
+  <div class="card green">
+    <div class="card-label" id="lbl-fpk">FPK Completed</div>
+    <div class="card-value" id="stat-fpk-done">0</div>
+    <div class="card-sub"   id="sub-fpk-pct">0% siap</div>
+  </div>
+  <div class="card yellow">
+    <div class="card-label">Pending</div>
+    <div class="card-value" id="stat-pending">0</div>
+    <div class="card-sub">Not Started + In Progress</div>
+  </div>
+  <div class="card orange">
+    <div class="card-label">Perlu Pembetulan</div>
+    <div class="card-value" id="stat-correction">0</div>
+    <div class="card-sub"   id="sub-correction">Semua semakan</div>
+  </div>
+  <div class="card">
+    <div class="card-label" id="lbl-overall">Overall Progress</div>
+    <div class="card-value" id="stat-overall">0%</div>
+    <div class="card-sub"   id="sub-overall">FRP + FPK</div>
+  </div>
+</div>
+
+<!-- PROGRESS BARS -->
+<div class="progress-section">
+  <div class="progress-card">
+    <div class="progress-label"><span id="pb-frp-lbl">FRP Completion</span><span id="pb-frp-pct">0%</span></div>
+    <div class="pbar"><div class="pbar-fill blue"   id="pb-frp" style="width:0%"></div></div>
+  </div>
+  <div class="progress-card">
+    <div class="progress-label"><span id="pb-fpk-lbl">FPK Completion</span><span id="pb-fpk-pct">0%</span></div>
+    <div class="pbar"><div class="pbar-fill green"  id="pb-fpk" style="width:0%"></div></div>
+  </div>
+  <div class="progress-card">
+    <div class="progress-label"><span>Overall Completion</span><span id="pb-ov-pct">0%</span></div>
+    <div class="pbar"><div class="pbar-fill orange" id="pb-ov" style="width:0%"></div></div>
+  </div>
+</div>
+
+<!-- CHARTS -->
+<div class="charts-row">
+  <div class="chart-card">
+    <div class="chart-title">Kadar Completion FRP &amp; FPK mengikut Programme</div>
+    <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Taburan Status Semakan</div>
+    <div class="chart-wrap"><canvas id="pieChart"></canvas></div>
+  </div>
+</div>
+
+<!-- INFO PANEL -->
+<div class="info-panel">
+  <strong>Arahan:</strong>
+  Baris bertanda <span style="background:#fef3c7;color:#92400e;border-radius:99px;padding:1px 6px;border:1px solid #fcd34d;font-size:.74rem;">SAMPLE</span>
+  adalah rekod demonstrasi. Klik <strong>Edit</strong> untuk kemaskini atau <strong>Padam</strong> untuk buang rekod.
+  Klik <strong>+ Tambah Rekod</strong> untuk masukkan data sebenar jabatan.
+</div>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <input id="q" type="text" placeholder="Cari kod kursus, nama kursus atau pensyarah..." oninput="applyFilters()" />
+  <select id="fProg" onchange="applyFilters()"><option value="">Semua Programme</option></select>
+  <select id="fSem" onchange="applyFilters()">
+    <option value="">Semua Semester</option>
+    <option value="1">Semester 1</option>
+    <option value="2">Semester 2</option>
+    <option value="3">Semester 3</option>
+    <option value="4">Semester 4</option>
+    <option value="5">Semester 5</option>
+  </select>
+  <select id="fStatus" onchange="applyFilters()">
+    <option value="">Semua Status</option>
+    <option value="Completed">Completed</option>
+    <option value="Not Completed">Not Completed</option>
+    <option value="In Progress">In Progress</option>
+    <option value="Not Started">Not Started</option>
+    <option value="Requires Correction">Requires Correction</option>
+  </select>
+  <button class="btn btn-primary"   onclick="openAdd()">+ Tambah Rekod</button>
+  <button class="btn btn-secondary" onclick="doReset()">Reset ke Data Sample</button>
+</div>
+
+<!-- TABLE -->
+<div class="table-section">
+  <div class="table-header">
+    <h3 id="tblCount">Menunjukkan semua rekod</h3>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="left" rowspan="2">#</th>
+          <th class="left" rowspan="2">Programme</th>
+          <th class="left" rowspan="2">Kod Kursus</th>
+          <th class="left" rowspan="2">Nama Kursus</th>
+          <th rowspan="2">Sem</th>
+          <th class="left" rowspan="2">Pensyarah</th>
+          <th colspan="2" class="th-frp" id="hdr-frp">FRP</th>
+          <th colspan="2" class="th-fpk" id="hdr-fpk">FPK</th>
+          <th class="left" rowspan="2">Catatan</th>
+          <th rowspan="2">Tindakan</th>
+        </tr>
+        <tr>
+          <th class="th-frp" id="hdr-frp1">Semakan 1</th>
+          <th class="th-frp" id="hdr-frp2">Semakan 2</th>
+          <th class="th-fpk" id="hdr-fpk1">Semakan 1</th>
+          <th class="th-fpk" id="hdr-fpk2">Semakan 2</th>
+        </tr>
+      </thead>
+      <tbody id="tBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<footer>FRP &amp; FPK Review Monitoring Dashboard &mdash; Department of Commerce, Politeknik Port Dickson &mdash; Made with IBM Bob</footer>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modalTitle">Tambah Rekod Semakan Kursus</h3>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section">
+        <div class="modal-section-title ms-blue">Maklumat Kursus</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Programme *</label>
+            <select id="fProgramme">
+              <option value="">-- Pilih --</option>
+              <option>Diploma in Accountancy</option>
+              <option>Diploma in Marketing</option>
+              <option>Diploma in Secretarial Science</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Semester *</label>
+            <select id="fSemester">
+              <option value="">-- Pilih --</option>
+              <option value="1">Semester 1</option>
+              <option value="2">Semester 2</option>
+              <option value="3">Semester 3</option>
+              <option value="4">Semester 4</option>
+              <option value="5">Semester 5</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Kod Kursus</label>
+            <input id="fCode" type="text" placeholder="cth. ACC101" />
+          </div>
+          <div class="form-group">
+            <label>Nama Pensyarah *</label>
+            <input id="fLecturer" type="text" placeholder="cth. Puan Nor Azizah" />
+          </div>
+          <div class="form-group full">
+            <label>Nama Kursus *</label>
+            <input id="fName" type="text" placeholder="cth. Financial Accounting I" />
+          </div>
+        </div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-section-title ms-frp">Semakan FRP</div>
+        <div class="form-grid-4">
+          <div class="form-group">
+            <label>Semakan 1 - Status *</label>
+            <select id="fFrp1">
+              <option value="Not Started">Not Started</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+              <option value="Not Completed">Not Completed</option>
+              <option value="Requires Correction">Requires Correction</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Semakan 1 - Tarikh</label>
+            <input id="fFrp1d" type="date" />
+          </div>
+          <div class="form-group">
+            <label>Semakan 2 - Status *</label>
+            <select id="fFrp2">
+              <option value="Not Started">Not Started</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+              <option value="Not Completed">Not Completed</option>
+              <option value="Requires Correction">Requires Correction</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Semakan 2 - Tarikh</label>
+            <input id="fFrp2d" type="date" />
+          </div>
+        </div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-section-title ms-fpk">Semakan FPK</div>
+        <div class="form-grid-4">
+          <div class="form-group">
+            <label>Semakan 1 - Status *</label>
+            <select id="fFpk1">
+              <option value="Not Started">Not Started</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+              <option value="Not Completed">Not Completed</option>
+              <option value="Requires Correction">Requires Correction</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Semakan 1 - Tarikh</label>
+            <input id="fFpk1d" type="date" />
+          </div>
+          <div class="form-group">
+            <label>Semakan 2 - Status *</label>
+            <select id="fFpk2">
+              <option value="Not Started">Not Started</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+              <option value="Not Completed">Not Completed</option>
+              <option value="Requires Correction">Requires Correction</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Semakan 2 - Tarikh</label>
+            <input id="fFpk2d" type="date" />
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Catatan</label>
+        <textarea id="fRemarks" placeholder="Nota tambahan (pilihan)..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Batal</button>
+      <button class="btn btn-primary"   onclick="saveRecord()">Simpan Rekod</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── SAMPLE DATA ─────────────────────────────────────────────── */
+const SAMPLE_DATA = [
+  {id:1,  prog:"Diploma in Accountancy",        code:"",name:"",sem:"1",lec:"",frp1:"Not Started",frp1d:"",frp2:"Not Started",frp2d:"",fpk1:"Not Started",fpk1d:"",fpk2:"Not Started",fpk2d:"",rem:"[SAMPLE]",sample:true},
+  {id:2,  prog:"Diploma in Accountancy",        code:"",name:"",sem:"2",lec:"",frp1:"Not Started",frp1d:"",frp2:"Not Started",frp2d:"",fpk1:"Not Started",fpk1d:"",fpk2:"Not Started",fpk2d:"",rem:"[SAMPLE]",sample:true},
+  {id:3,  prog:"Diploma in Accountancy",        code:"",name:"",sem:"3",lec:"",frp1:"Not Started",frp1d:"",frp2:"Not Started",frp2d:"",fpk1:"Not Started",fpk1d:"",fpk2:"Not Started",fpk2d:"",rem:"[SAMPLE]",sample:true},
+  {id:4,  prog:"Diploma in Accountancy",        code:"",name:"",sem:"4",lec:"",frp1:"Not Started",frp1d:"",frp2:"Not Started",frp2d:"",fpk1:"Not Started",fpk1d:"",fpk2:"Not Started",fpk2d:"",rem:"[SAMPLE]",sample:true},
+  {id:5,  prog:"Diploma in Accountancy",        code:"",name:"",sem:"5",lec:"",frp1:"Not Started",frp1d:"",frp2:"Not Started",frp2d:"",fpk1:"Not Started",fpk1d:"",fpk2:"Not Started",fpk2d:"",rem:"[SAMPLE]",sample:true},
+  {id:6,  prog:"Diploma in Marketing",          code:"",name:"",sem:"1",lec:"",frp1:"Not Started",frp1d:"",frp2:"Not Started",frp2d:"",fpk1:"Not Started",fpk1d:"",fpk2:"Not Started",fpk2d:"",rem:"[SAMPLE]",sample:true},
+  {id:7,  prog:"Diploma in Marketing",          code:"",name:"",sem:"2",lec:"",frp1:"Not Started",frp1d:"",frp2:"Not Started",frp2d:"",fpk1:"Not Started",fpk1d:"",fpk2:"Not Started",fpk2d:"",rem:"[SAMPLE]",sample:true},
+  {id:8,  prog:"Diploma in Marketing",          code:"",name:"",sem:"3",lec:"",frp1:"Not Started",frp1d:"",frp2:"Not Started",frp2d:"",fpk1:"Not Started",fpk1d:"",fpk2:"Not Started",fpk2d:"",rem:"[SAMPLE]",sample:true},
+  {id:9,  prog:"Diploma in Marketing",          code:"",name:"",sem:"4",lec:"",frp1:"Not Started",frp1d:"",frp2:"Not Started",frp2d:"",fpk1:"Not Started",fpk1d:"",fpk2:"Not Started",fpk2d:"",rem:"[SAMPLE]",sample:true},
+  {id:10, prog:"Diploma in Marketing",          code:"",name:"",sem:"5",lec:"",frp1:"Not Started",frp1d:"",frp2:"Not Started",frp2d:"",fpk1:"Not Started",fpk1d:"",fpk2:"Not Started",fpk2d:"",rem:"[SAMPLE]",sample:true},
+  {id:11, prog:"Diploma in Secretarial Science",code:"",name:"",sem:"1",lec:"",frp1:"Not Started",frp1d:"",frp2:"Not Started",frp2d:"",fpk1:"Not Started",fpk1d:"",fpk2:"Not Started",fpk2d:"",rem:"[SAMPLE]",sample:true},
+  {id:12, prog:"Diploma in Secretarial Science",code:"",name:"",sem:"2",lec:"",frp1:"Not Started",frp1d:"",frp2:"Not Started",frp2d:"",fpk1:"Not Started",fpk1d:"",fpk2:"Not Started",fpk2d:"",rem:"[SAMPLE]",sample:true},
+  {id:13, prog:"Diploma in Secretarial Science",code:"",name:"",sem:"3",lec:"",frp1:"Not Started",frp1d:"",frp2:"Not Started",frp2d:"",fpk1:"Not Started",fpk1d:"",fpk2:"Not Started",fpk2d:"",rem:"[SAMPLE]",sample:true},
+  {id:14, prog:"Diploma in Secretarial Science",code:"",name:"",sem:"4",lec:"",frp1:"Not Started",frp1d:"",frp2:"Not Started",frp2d:"",fpk1:"Not Started",fpk1d:"",fpk2:"Not Started",fpk2d:"",rem:"[SAMPLE]",sample:true},
+  {id:15, prog:"Diploma in Secretarial Science",code:"",name:"",sem:"5",lec:"",frp1:"Not Started",frp1d:"",frp2:"Not Started",frp2d:"",fpk1:"Not Started",fpk1d:"",fpk2:"Not Started",fpk2d:"",rem:"[SAMPLE]",sample:true},
+];
+
+/* ── STATE ───────────────────────────────────────────────────── */
+let records = [], editId = null, barChart = null, pieChart = null, currentView = 'all';
+const SK = 'frp_fpk_v5', VK = 'frp_fpk_ver', VER = '5', SESS_K = 'frp_fpk_sess';
+
+/* ── INIT ────────────────────────────────────────────────────── */
+function init() {
+  if (localStorage.getItem(VK) !== VER) {
+    localStorage.removeItem(SK);
+    localStorage.setItem(VK, VER);
+  }
+  const s = localStorage.getItem(SK);
+  records = s ? JSON.parse(s) : JSON.parse(JSON.stringify(SAMPLE_DATA));
+  document.getElementById('sess').value = localStorage.getItem(SESS_K) || '2024/2025 Sem 1';
+  fillProgFilter();
+  renderAll();
+  initCharts();
+}
+
+function persist() { localStorage.setItem(SK, JSON.stringify(records)); }
+function saveSession() { localStorage.setItem(SESS_K, document.getElementById('sess').value); }
+
+function doReset() {
+  if (!confirm('Reset semua rekod ke data sample? Perubahan akan hilang.')) return;
+  records = JSON.parse(JSON.stringify(SAMPLE_DATA));
+  persist(); renderAll(); updateCharts();
+}
+
+/* ── PROGRAMME FILTER ────────────────────────────────────────── */
+function fillProgFilter() {
+  const sel = document.getElementById('fProg');
+  const cur = sel.value;
+  while (sel.options.length > 1) sel.remove(1);
+  [...new Set(records.map(r => r.prog))].sort().forEach(p => {
+    const o = document.createElement('option'); o.value = p; o.textContent = p; sel.appendChild(o);
+  });
+  sel.value = cur;
+}
+
+/* ── VIEW ────────────────────────────────────────────────────── */
+function vk() {
+  if (currentView === 'sem1') return {frp:'frp1',frpd:'frp1d',fpk:'fpk1',fpkd:'fpk1d',lbl:'Semakan 1'};
+  if (currentView === 'sem2') return {frp:'frp2',frpd:'frp2d',fpk:'fpk2',fpkd:'fpk2d',lbl:'Semakan 2'};
+  return {frp:null,fpk:null,lbl:'Semua Semakan'};
+}
+
+function setView(v) {
+  currentView = v;
+  ['all','sem1','sem2'].forEach(id => document.getElementById('tab-'+id).classList.toggle('active', id===v));
+  const lbl = {all:'Paparan: Semua Semakan', sem1:'Paparan: Semakan 1 Sahaja', sem2:'Paparan: Semakan 2 Sahaja'};
+  document.getElementById('viewBanner').textContent = lbl[v];
+  renderAll();
+}
+
+/* ── STATS ───────────────────────────────────────────────────── */
+function computeStats(data) {
+  const n = data.length, pct = x => n ? Math.round(x/n*100) : 0, k = vk();
+  if (currentView !== 'all') {
+    const fd = data.filter(r=>r[k.frp]==='Completed').length;
+    const pkd = data.filter(r=>r[k.fpk]==='Completed').length;
+    const corr = data.filter(r=>r[k.frp]==='Requires Correction'||r[k.fpk]==='Requires Correction').length;
+    const pend = data.filter(r=>['Not Started','In Progress'].includes(r[k.frp])||['Not Started','In Progress'].includes(r[k.fpk])).length;
+    const ov = n*2 ? Math.round((fd+pkd)/(n*2)*100) : 0;
+    return {n,fd,pkd,fp:pct(fd),pp:pct(pkd),corr,pend,ov};
+  }
+  const fd  = data.filter(r=>r.frp1==='Completed').length + data.filter(r=>r.frp2==='Completed').length;
+  const pkd = data.filter(r=>r.fpk1==='Completed').length + data.filter(r=>r.fpk2==='Completed').length;
+  const corr = data.filter(r=>r.frp1==='Requires Correction'||r.frp2==='Requires Correction'||r.fpk1==='Requires Correction'||r.fpk2==='Requires Correction').length;
+  const pend = data.filter(r=>['Not Started','In Progress'].includes(r.frp1)||['Not Started','In Progress'].includes(r.frp2)||['Not Started','In Progress'].includes(r.fpk1)||['Not Started','In Progress'].includes(r.fpk2)).length;
+  const ov = n*4 ? Math.round((fd+pkd)/(n*4)*100) : 0;
+  return {n,fd,pkd,fp:n*2?Math.round(fd/(n*2)*100):0,pp:n*2?Math.round(pkd/(n*2)*100):0,corr,pend,ov};
+}
+
+function updateCards() {
+  const s = computeStats(records), k = vk(), l = k.lbl;
+  const isAll = currentView==='all';
+  document.getElementById('stat-total').textContent    = s.n;
+  document.getElementById('stat-frp-done').textContent = s.fd;
+  document.getElementById('sub-frp-pct').textContent   = s.fp+'% siap';
+  document.getElementById('stat-fpk-done').textContent = s.pkd;
+  document.getElementById('sub-fpk-pct').textContent   = s.pp+'% siap';
+  document.getElementById('stat-pending').textContent  = s.pend;
+  document.getElementById('stat-correction').textContent = s.corr;
+  document.getElementById('stat-overall').textContent  = s.ov+'%';
+  document.getElementById('lbl-frp').textContent     = isAll ? 'FRP Completed (Sem.1+2)' : 'FRP Completed ('+l+')';
+  document.getElementById('lbl-fpk').textContent     = isAll ? 'FPK Completed (Sem.1+2)' : 'FPK Completed ('+l+')';
+  document.getElementById('lbl-overall').textContent = isAll ? 'Overall Progress (4 Sem.)' : 'Overall Progress ('+l+')';
+  document.getElementById('sub-correction').textContent = l;
+  document.getElementById('sub-overall').textContent  = isAll ? 'FRP Sem.1+2 & FPK Sem.1+2' : 'FRP + FPK '+l;
+  document.getElementById('pb-frp-lbl').textContent   = isAll ? 'FRP (Sem.1+2)' : 'FRP ('+l+')';
+  document.getElementById('pb-fpk-lbl').textContent   = isAll ? 'FPK (Sem.1+2)' : 'FPK ('+l+')';
+  const sp = (bar,pct,lbl) => { document.getElementById(bar).style.width=pct+'%'; document.getElementById(lbl).textContent=pct+'%'; };
+  sp('pb-frp','pb-frp-pct',s.fp); sp('pb-fpk','pb-fpk-pct',s.pp); sp('pb-ov','pb-ov-pct',s.ov);
+}
+
+/* ── CHARTS ──────────────────────────────────────────────────── */
+function getBarData() {
+  const progs = [...new Set(records.map(r=>r.prog))].sort();
+  const labels = progs.map(p=>p.replace('Diploma in ',''));
+  const pctKey = (key,p) => { const rows=records.filter(r=>r.prog===p); return rows.length?Math.round(rows.filter(r=>r[key]==='Completed').length/rows.length*100):0; };
+  const k = vk();
+  if (currentView!=='all') return {labels,datasets:[
+    {label:'FRP '+k.lbl+' (%)',data:progs.map(p=>pctKey(k.frp,p)),backgroundColor:'#1a56db',borderRadius:3},
+    {label:'FPK '+k.lbl+' (%)',data:progs.map(p=>pctKey(k.fpk,p)),backgroundColor:'#16a34a',borderRadius:3},
+  ]};
+  return {labels,datasets:[
+    {label:'Sem.1 FRP (%)',data:progs.map(p=>pctKey('frp1',p)),backgroundColor:'#1a56db',borderRadius:3},
+    {label:'Sem.2 FRP (%)',data:progs.map(p=>pctKey('frp2',p)),backgroundColor:'#7c3aed',borderRadius:3},
+    {label:'Sem.1 FPK (%)',data:progs.map(p=>pctKey('fpk1',p)),backgroundColor:'#16a34a',borderRadius:3},
+    {label:'Sem.2 FPK (%)',data:progs.map(p=>pctKey('fpk2',p)),backgroundColor:'#0891b2',borderRadius:3},
+  ]};
+}
+
+function getPieData() {
+  const statuses=['Completed','In Progress','Not Started','Requires Correction','Not Completed'];
+  const k=vk(), keys=currentView!=='all'?[k.frp,k.fpk]:['frp1','frp2','fpk1','fpk2'];
+  return {labels:statuses,counts:statuses.map(s=>keys.reduce((sum,key)=>sum+records.filter(r=>r[key]===s).length,0))};
+}
+
+function initCharts() {
+  const bd=getBarData();
+  barChart=new Chart(document.getElementById('barChart'),{type:'bar',data:{labels:bd.labels,datasets:bd.datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10},boxWidth:12}}},scales:{y:{max:100,ticks:{callback:v=>v+'%',font:{size:10}},grid:{color:'#e2e8f0'}},x:{ticks:{font:{size:10}},grid:{display:false}}}}});
+  const pd=getPieData();
+  pieChart=new Chart(document.getElementById('pieChart'),{type:'pie',data:{labels:pd.labels,datasets:[{data:pd.counts,backgroundColor:['#16a34a','#ca8a04','#dc2626','#ea580c','#7e22ce'],borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:11},padding:10}}}}});
+}
+
+function updateCharts() {
+  if (!barChart||!pieChart) return;
+  const bd=getBarData(); barChart.data.labels=bd.labels; barChart.data.datasets=bd.datasets; barChart.update();
+  const pd=getPieData(); pieChart.data.datasets[0].data=pd.counts; pieChart.update();
+}
+
+/* ── BADGE / DATE CELL ───────────────────────────────────────── */
+function badge(s) {
+  const m={'Completed':'s-completed','In Progress':'s-inprogress','Not Started':'s-notstarted','Requires Correction':'s-correction','Not Completed':'s-notcompleted'};
+  return '<span class="status-badge '+(m[s]||'")>'+s+'</span>';
+}
+function dc(d) { return d?'<span style="font-size:.74rem;color:var(--muted)">'+d+'</span>':'<span style="color:var(--border)">-</span>'; }
+
+/* ── TABLE ───────────────────────────────────────────────────── */
+function getFiltered() {
+  const q=document.getElementById('q').value.toLowerCase().trim();
+  const prog=document.getElementById('fProg').value;
+  const sem=document.getElementById('fSem').value;
+  const st=document.getElementById('fStatus').value;
+  const k=vk();
+  return records.filter(r=>{
+    if(q&&!(r.code.toLowerCase().includes(q)||r.name.toLowerCase().includes(q)||r.lec.toLowerCase().includes(q))) return false;
+    if(prog&&r.prog!==prog) return false;
+    if(sem&&r.sem!==sem) return false;
+    if(st){
+      if(currentView!=='all'){if(r[k.frp]!==st&&r[k.fpk]!==st)return false;}
+      else{if(r.frp1!==st&&r.frp2!==st&&r.fpk1!==st&&r.fpk2!==st)return false;}
+    }
+    return true;
+  });
+}
+
+function updateTblHeader() {
+  const k=vk(),isAll=currentView==='all';
+  const h1=document.getElementById('hdr-frp1'),h2=document.getElementById('hdr-frp2');
+  const h3=document.getElementById('hdr-fpk1'),h4=document.getElementById('hdr-fpk2');
+  document.getElementById('hdr-frp').colSpan=isAll?2:1;
+  document.getElementById('hdr-fpk').colSpan=isAll?2:1;
+  h1.textContent=isAll?'Semakan 1':k.lbl; h2.style.display=isAll?'':'none';
+  h3.textContent=isAll?'Semakan 1':k.lbl; h4.style.display=isAll?'':'none';
+}
+
+function renderTable(rows) {
+  updateTblHeader();
+  const tb=document.getElementById('tBody');
+  tb.innerHTML='';
+  const cols=currentView==='all'?12:10;
+  if(!rows.length){tb.innerHTML='<tr id="empty-row"><td colspan="'+cols+'">Tiada rekod menepati penapis semasa.</td></tr>';return;}
+  const k=vk();
+  rows.forEach((r,i)=>{
+    const sb=r.sample?'<span class="sample-badge">SAMPLE</span>':'';
+    const cells=currentView==='all'
+      ?'<td>'+badge(r.frp1)+'<br>'+dc(r.frp1d)+'</td><td>'+badge(r.frp2)+'<br>'+dc(r.frp2d)+'</td><td>'+badge(r.fpk1)+'<br>'+dc(r.fpk1d)+'</td><td>'+badge(r.fpk2)+'<br>'+dc(r.fpk2d)+'</td>'
+      :'<td>'+badge(r[k.frp])+'<br>'+dc(r[k.frpd])+'</td><td>'+badge(r[k.fpk])+'<br>'+dc(r[k.fpkd])+'</td>';
+    const tr=document.createElement('tr');
+    tr.innerHTML='<td>'+(i+1)+'</td><td class="left">'+r.prog+'</td><td class="left"><strong>'+(r.code||'-')+'</strong></td><td class="left">'+(r.name||'-')+sb+'</td><td>'+r.sem+'</td><td class="left">'+(r.lec||'-')+'</td>'+cells+'<td class="left" style="max-width:150px;white-space:normal;word-break:break-word;font-size:.76rem;">'+(r.rem||'')+'</td><td><div class="actions-cell"><button class="btn btn-secondary btn-sm" onclick="openEdit('+r.id+')">Edit</button><button class="btn btn-danger btn-sm" onclick="delRec('+r.id+')">Padam</button></div></td>';
+    tb.appendChild(tr);
+  });
+}
+
+function applyFilters() {
+  const f=getFiltered();
+  renderTable(f);
+  document.getElementById('tblCount').textContent=f.length===records.length?'Menunjukkan semua '+records.length+' rekod':'Menunjukkan '+f.length+' daripada '+records.length+' rekod';
+}
+
+/* ── RENDER ALL ──────────────────────────────────────────────── */
+function renderAll() { fillProgFilter(); updateCards(); applyFilters(); updateCharts(); }
+
+/* ── CRUD ────────────────────────────────────────────────────── */
+function nextId(){ return records.length?Math.max(...records.map(r=>r.id))+1:1; }
+
+function openAdd() {
+  editId=null;
+  document.getElementById('modalTitle').textContent='Tambah Rekod Semakan Kursus';
+  clearForm();
+  document.getElementById('modal').classList.add('open');
+}
+
+function openEdit(id) {
+  editId=id;
+  const r=records.find(x=>x.id===id); if(!r) return;
+  document.getElementById('modalTitle').textContent='Edit Rekod Semakan Kursus';
+  document.getElementById('fProgramme').value=r.prog;
+  document.getElementById('fSemester').value=r.sem;
+  document.getElementById('fCode').value=r.code;
+  document.getElementById('fName').value=r.name;
+  document.getElementById('fLecturer').value=r.lec;
+  document.getElementById('fFrp1').value=r.frp1;
+  document.getElementById('fFrp1d').value=r.frp1d;
+  document.getElementById('fFrp2').value=r.frp2;
+  document.getElementById('fFrp2d').value=r.frp2d;
+  document.getElementById('fFpk1').value=r.fpk1;
+  document.getElementById('fFpk1d').value=r.fpk1d;
+  document.getElementById('fFpk2').value=r.fpk2;
+  document.getElementById('fFpk2d').value=r.fpk2d;
+  document.getElementById('fRemarks').value=r.rem;
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal(){ document.getElementById('modal').classList.remove('open'); editId=null; }
+
+function clearForm(){
+  ['fProgramme','fSemester','fCode','fName','fLecturer','fFrp1d','fFrp2d','fFpk1d','fFpk2d','fRemarks'].forEach(id=>document.getElementById(id).value='');
+  ['fFrp1','fFrp2','fFpk1','fFpk2'].forEach(id=>document.getElementById(id).value='Not Started');
+}
+
+function saveRecord(){
+  const prog=document.getElementById('fProgramme').value;
+  const sem=document.getElementById('fSemester').value;
+  const name=document.getElementById('fName').value.trim();
+  const lec=document.getElementById('fLecturer').value.trim();
+  if(!prog||!sem||!name||!lec){alert('Sila isi semua medan wajib (Programme, Semester, Nama Kursus, Pensyarah).');return;}
+  const rec={
+    prog, sem,
+    code:document.getElementById('fCode').value.trim().toUpperCase(),
+    name, lec,
+    frp1:document.getElementById('fFrp1').value, frp1d:document.getElementById('fFrp1d').value,
+    frp2:document.getElementById('fFrp2').value, frp2d:document.getElementById('fFrp2d').value,
+    fpk1:document.getElementById('fFpk1').value, fpk1d:document.getElementById('fFpk1d').value,
+    fpk2:document.getElementById('fFpk2').value, fpk2d:document.getElementById('fFpk2d').value,
+    rem:document.getElementById('fRemarks').value.trim(),
+    sample:false
+  };
+  if(editId!==null){
+    const i=records.findIndex(r=>r.id===editId);
+    if(i>-1) records[i]={...records[i],...rec};
+  } else {
+    records.push({id:nextId(),...rec});
+  }
+  persist(); closeModal(); renderAll();
+}
+
+function delRec(id){
+  if(!confirm('Padam rekod ini?')) return;
+  records=records.filter(r=>r.id!==id);
+  persist(); renderAll();
+}
+
+document.getElementById('modal').addEventListener('click',function(e){if(e.target===this)closeModal();});
+
+init();
+</script>
+</body>
+</html>
